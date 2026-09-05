@@ -1,0 +1,236 @@
+if game:GetService("CoreGui"):FindFirstChild("AntiCheatTestGui") then
+    game:GetService("CoreGui").AntiCheatTestGui:Destroy()
+end
+
+-- Main Layout Containers
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local UICorner = Instance.new("UICorner")
+local UIStroke = Instance.new("UIStroke")
+local Title = Instance.new("TextLabel")
+local ToggleButton = Instance.new("TextButton")
+local ButtonCorner = Instance.new("UICorner")
+local SpeedLabel = Instance.new("TextLabel")
+local SpeedInput = Instance.new("TextBox")
+local InputCorner = Instance.new("UICorner")
+
+-- Setup GUI Core
+ScreenGui.Name = "AntiCheatTestGui"
+ScreenGui.Parent = game:GetService("CoreGui")
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
+MainFrame.Size = UDim2.new(0, 220, 0, 160)
+MainFrame.BorderSizePixel = 0
+
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+UIStroke.Thickness = 2
+UIStroke.Color = Color3.fromRGB(60, 60, 70)
+UIStroke.Parent = MainFrame
+
+Title.Name = "Title"
+Title.Parent = MainFrame
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0, 0, 0, 8)
+Title.Size = UDim2.new(1, 0, 0, 20)
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = "STRICT VERIFIED FARM"
+Title.TextColor3 = Color3.fromRGB(240, 240, 240)
+Title.TextSize = 16
+
+-- Speed Delay Input
+SpeedLabel.Name = "SpeedLabel"
+SpeedLabel.Parent = MainFrame
+SpeedLabel.BackgroundTransparency = 1
+SpeedLabel.Position = UDim2.new(0.05, 0, 0.25, 0)
+SpeedLabel.Size = UDim2.new(0.5, 0, 0, 25)
+SpeedLabel.Font = Enum.Font.SourceSans
+SpeedLabel.Text = "Post-Verify Delay:"
+SpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+SpeedLabel.TextSize = 14
+SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+SpeedInput.Name = "SpeedInput"
+SpeedInput.Parent = MainFrame
+SpeedInput.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+SpeedInput.Position = UDim2.new(0.6, 0, 0.25, 0)
+SpeedInput.Size = UDim2.new(0.35, 0, 0, 25)
+SpeedInput.Font = Enum.Font.SourceSansBold
+SpeedInput.Text = "0.05"
+SpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedInput.TextSize = 14
+
+InputCorner.CornerRadius = UDim.new(0, 5)
+InputCorner.Parent = SpeedInput
+
+-- Action Button
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Parent = MainFrame
+ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+ToggleButton.Position = UDim2.new(0.05, 0, 0.55, 0)
+ToggleButton.Size = UDim2.new(0.9, 0, 0, 45)
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Text = "START FARM"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 18
+
+ButtonCorner.CornerRadius = UDim.new(0, 8)
+ButtonCorner.Parent = ToggleButton
+
+-- Draggable UI Script Logic
+local UserInputService = game:GetService("UserInputService")
+local dragging, dragInput, dragStart, startPos
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = MainFrame.Position
+        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+    end
+end)
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Main Automation System
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+local checkpointsFolder = workspace:WaitForChild("Checkpoints", 5)
+local rebirthRemote = ReplicatedStorage:WaitForChild("Rebirth", 5)
+local isTeleporting = false
+
+-- Locate Stage inside player leaderstats
+local leaderstats = player:WaitForChild("leaderstats", 5)
+local stageValue = leaderstats and leaderstats:WaitForChild("Stage", 5)
+
+local function getSortedCheckpoints()
+	local checkpoints = {}
+	for _, child in ipairs(checkpointsFolder:GetChildren()) do
+		local num = tonumber(child.Name)
+		if num then
+			table.insert(checkpoints, {Part = child, Num = num})
+		end
+	end
+	table.sort(checkpoints, function(a, b) return a.Num < b.Num end)
+	return checkpoints
+end
+
+local function getClosestCheckpointIndex(sortedCheckpoints, playerPosition)
+    local closestIndex = 1
+    local shortestDistance = math.huge
+    for i, data in ipairs(sortedCheckpoints) do
+        local dist = (data.Part.Position - playerPosition).Magnitude
+        if dist < shortestDistance then
+            shortestDistance = dist
+            closestIndex = i
+        end
+    end
+    return closestIndex
+end
+
+local function simulateTouch(part)
+    local character = player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if root and part and firetouchinterest then
+        firetouchinterest(root, part, 0)
+        task.wait(0.01)
+        firetouchinterest(root, part, 1)
+    end
+end
+
+local function startTeleportation()
+    while isTeleporting do
+        local sortedCheckpoints = getSortedCheckpoints()
+        local character = player.Character
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then 
+            task.wait(0.5)
+            continue 
+        end
+        
+        local startIndex = getClosestCheckpointIndex(sortedCheckpoints, rootPart.Position)
+        local hitMaxStage = false
+
+        for i = startIndex, #sortedCheckpoints do
+            if not isTeleporting then break end
+            
+            local checkpoint = sortedCheckpoints[i].Part
+            local stageNum = sortedCheckpoints[i].Num
+            
+            character = player.Character
+            if not character then continue end
+            rootPart = character:FindFirstChild("HumanoidRootPart")
+            if not rootPart then continue end
+            
+            -- Physical positioning frame setup
+            rootPart.Velocity = Vector3.new(0,0,0)
+            rootPart.CFrame = checkpoint.CFrame + Vector3.new(0, 3, 0)
+            
+            -- Absolute Infinite Verification Loop Block
+            -- It will stay right here until the condition evaluates to true
+            while isTeleporting do
+                simulateTouch(checkpoint)
+                
+                -- Condition Check: Leaderstat update validation match routine
+                if stageValue and (stageValue.Value >= stageNum or (stageNum == 241 and stageValue.Value == 1)) then
+                    break -- Verification passed! Exit this local block loop safely.
+                end
+                
+                task.wait(0.05) -- Safe interval pace to keep spamming until server saves
+            end
+            
+            -- Rebirth Validation Trigger Hook
+            if stageNum == 241 then
+                hitMaxStage = true
+                rootPart.Anchored = true
+                task.wait(0.2) 
+                
+                if rebirthRemote then
+                    if rebirthRemote:IsA("RemoteEvent") then
+                        rebirthRemote:FireServer()
+                    elseif rebirthRemote:IsA("RemoteFunction") then
+                        rebirthRemote:InvokeServer()
+                    end
+                end
+                
+                rootPart.Anchored = false
+                task.wait(0.5)
+                break
+            end
+            
+            -- Custom textbox delay acts purely as an additional rest buffer post-verification
+            local customDelay = tonumber(SpeedInput.Text) or 0.05
+            task.wait(customDelay) 
+        end
+        
+        if not isTeleporting or not hitMaxStage then 
+            break 
+        end
+    end
+
+	isTeleporting = false
+	ToggleButton.Text = "START FARM"
+	ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+end
+
+ToggleButton.MouseButton1Click:Connect(function()
+	isTeleporting = not isTeleporting
+	
+	if isTeleporting then
+		ToggleButton.Text = "STOP FARM"
+		ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+		task.spawn(startTeleportation)
+	else
+		ToggleButton.Text = "START FARM"
+		ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+	end
+end)
